@@ -6,8 +6,9 @@ import json
 import datetime
 stemmer = LancasterStemmer()
 
-# 3 classes of training data
 training_data = []
+
+# 3 classes of training data
 training_data.append({"class":"greeting", "sentence":"how are you?"})
 training_data.append({"class":"greeting", "sentence":"how is your day?"})
 training_data.append({"class":"greeting", "sentence":"good day"})
@@ -205,14 +206,11 @@ def train(X, y, hidden_neurons=10, alpha=1, epochs=50000, dropout=False, dropout
                'words': words,
                'classes': classes
               }
-    synapse_file = "synapses.json"
+    synapse_file = "synapses-ex.json"
 
     with open(synapse_file, 'w') as outfile:
         json.dump(synapse, outfile, indent=4, sort_keys=True)
     print ("saved synapses to:", synapse_file)
-
-
-
 
 
 X = np.array(training)
@@ -220,33 +218,11 @@ y = np.array(output)
 
 start_time = time.time()
 
+print('INPUT: ', training)
+print('OUTPUT: ', output)
 train(X, y, hidden_neurons=20, alpha=0.1, epochs=100000, dropout=False, dropout_percent=0.2)
 
 elapsed_time = time.time() - start_time
 print ("processing time:", elapsed_time, "seconds")
 
-# probability threshold
-ERROR_THRESHOLD = 0.2
-# load our calculated synapse values
-synapse_file = 'synapses.json' 
-with open(synapse_file) as data_file: 
-    synapse = json.load(data_file) 
-    synapse_0 = np.asarray(synapse['synapse0']) 
-    synapse_1 = np.asarray(synapse['synapse1'])
 
-def classify(sentence, show_details=False):
-    results = think(sentence, show_details)
-
-    results = [[i,r] for i,r in enumerate(results) if r>ERROR_THRESHOLD ] 
-    results.sort(key=lambda x: x[1], reverse=True) 
-    return_results =[[classes[r[0]],r[1]] for r in results]
-    print ("%s \n classification: %s" % (sentence, return_results))
-    return return_results
-
-classify("sudo make me a sandwich")
-classify("how are you today?")
-classify("talk to you tomorrow")
-classify("who are you?")
-classify("make me some lunch")
-print ()
-classify("how was your lunch?", show_details=True)
