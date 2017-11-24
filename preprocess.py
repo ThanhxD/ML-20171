@@ -16,9 +16,8 @@ def normalize(file):
         ' email ': '[^\r\n @]+@[^ ]+',
         ' url ': '(((http|https):*\/\/[^\s]*)|((www)\.[^\s]*)|([^\s]*(\.com|\.co\.uk|\.net)[^\s]*))',
         ' number ': '\d+[\.\,]*\d*',
-        '*': '(\'s|\'ll|n\'t|\'re|\'d|\'ve|\�)',
-        '#': '[\<\,\>\.\?\/\:\;\'\"\{\[\}\]\-\_\+\=\(\)\|\\\*\&\^\%\$\#\@\!\~\`]',
-        ' ': '[\W\#]'
+        '*': '(\'s|\'ll|n\'t|\'re|\'d|\'ve)',
+        ' ': '[^a-zA-Z]'
     }
     for key in match:
         text = re.sub(match[key], key, text)
@@ -157,10 +156,10 @@ def make_dictionary():
             if value >= 2e-05:
                 new_line.append(word)
             j += 1
-        dictionary.append(new_line)
+        dictionary += new_line
 
     # write out
-    write_file('resources/dictionary', str(dictionary))
+    write_file('resources/dictionary', ', '.join(dictionary))
 
     print('dictionary: ', len(dictionary))
     print('train_folder: ', len(train_folders))
@@ -168,24 +167,23 @@ def make_dictionary():
         print('i: ', i)
         folder_name = train_folders[i]
         train_files = os.listdir(f'resources/data/train/{folder_name}')
-        line = dictionary[i]
         for file in train_files:
             text = read_file(f'resources/data/train/{folder_name}/{file}')
             arr_text = text.split(', ');
-            elements_in_both_lists = [w for w in arr_text if w in line]
+            elements_in_both_lists = [w for w in arr_text if w in dictionary]
             print(f'Write: {folder_name}/{file}')
             write_file(f'resources/data/processed/{folder_name}/{file}', ', '.join(elements_in_both_lists))
 
 def main():
     # """ MAIN FUNCTION """
     
-   #stemmer = LancasterStemmer()
-   #lemmatizer = WordNetLemmatizer()
-   #stop_words = load_stop_word(lemmatizer, stemmer)
-   #process_data(lemmatizer, stemmer, stop_words)
+    stemmer = LancasterStemmer()
+    lemmatizer = WordNetLemmatizer()
+    stop_words = load_stop_word(lemmatizer, stemmer)
+    process_data(lemmatizer, stemmer, stop_words)
     
     # make_dictionary(stemmer)
-     make_dictionary()  
+    make_dictionary()  
 
 if __name__ == '__main__':
     main()

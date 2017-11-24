@@ -16,20 +16,39 @@ words = []
 folders = os.listdir('resources/data/processed')
 dictionary = read_file('resources/dictionary').split(', ')
 words = dictionary
+count = 0
 
 for folder_name in folders:
     train_files = os.listdir(f'resources/data/processed/{folder_name}')
     classes.append(folder_name)
 
     for file in train_files:
-        text = read_file(f'resources/data/processed/{folder_name}/{file}')
+        text = read_file(f'resources/data/processed/{folder_name}/{file}').split(', ')
+        if len(text)<= 0:
+            continue
         line = [0] * len(dictionary)
         for word in text:
-            line[dictionary.index(word)] += 1
+            count += 1
+            if word == '':
+                continue
+            try:
+                line[dictionary.index(word)] += 1
+                break;
+            except:
+                print('error: ', file)
+                print('word: ', word)
+##                print('index: ', dictionary.index(word))
+                print('len: ', len(text))
+                raise
         training.append(list(line))
         output_new = [0] * len(classes)
         output_new[classes.index(folder_name)] = 1
         output.append(list(output_new))
+
+print('count: ', count)
+print('line len: ', len(training[0]))
+print('line o len: ', len(output[0]))
+print('out o: ', output[1])
 
 import numpy as np
 import time
@@ -122,7 +141,8 @@ def train(X, y, hidden_neurons=10, alpha=1, epochs=50000, dropout=False, dropout
         json.dump(synapse, outfile, indent=4, sort_keys=True)
     print ("saved synapses to:", synapse_file)
 
-
+print('training leng: ', len(training))
+print('ouput len: ', len(output))
 X = np.array(training)
 y = np.array(output)
 
@@ -130,7 +150,7 @@ start_time = time.time()
 
 print('INPUT: ', training)
 print('OUTPUT: ', output)
-train(X, y, hidden_neurons=20, alpha=0.1, epochs=100000, dropout=False, dropout_percent=0.2)
+##train(X, y, hidden_neurons=20, alpha=0.1, epochs=100000, dropout=False, dropout_percent=0.2)
 
 elapsed_time = time.time() - start_time
 print ("processing time:", elapsed_time, "seconds")
