@@ -3,6 +3,8 @@ import nltk
 from nltk.stem.lancaster import LancasterStemmer
 import os
 import json
+import numpy as np
+import time
 import datetime
 from preprocess import read_file
 from preprocess import write_file
@@ -14,19 +16,22 @@ output = []
 words = []
 
 folders = os.listdir('resources/data/processed')
+classes = np.array(folders)
 dictionary = read_file('resources/dictionary').split(', ')
-words = dictionary
+words = np.array(dictionary)
 count = 0
+
+training = np.array([], 'float32')
+output = np.array([], 'float32')
 
 for folder_name in folders:
     train_files = os.listdir(f'resources/data/processed/{folder_name}')
-    classes.append(folder_name)
 
     for file in train_files:
         text = read_file(f'resources/data/processed/{folder_name}/{file}').split(', ')
         if len(text)<= 0:
             continue
-        line = [0] * len(dictionary)
+        line = np.zeros(len(dictionary))
         for word in text:
             count += 1
             if word == '':
@@ -40,18 +45,18 @@ for folder_name in folders:
 ##                print('index: ', dictionary.index(word))
                 print('len: ', len(text))
                 raise
-        training.append(list(line))
-        output_new = [0] * len(classes)
-        output_new[classes.index(folder_name)] = 1
-        output.append(list(output_new))
-
+        training = np.append(training, line)
+        output_new = np.zeros(len(classes))
+        output_new[np.where(folders == folder_name)] = 1
+        output = np.append(output, output_new)
+    print('training: ', len(training))
+    print('line: ', len(line))
+    
+training = np.reshape(training, (count, len(dictionary)))
 print('count: ', count)
 print('line len: ', len(training[0]))
 print('line o len: ', len(output[0]))
 print('out o: ', output[1])
-
-import numpy as np
-import time
 
 # compute sigmoid nonlinearity
 def sigmoid(x):
