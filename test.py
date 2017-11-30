@@ -22,6 +22,7 @@ def run_test():
     for class_name in folders:
         test_cases = os.listdir(f'{tests_path}/{class_name}')
         for test_case in test_cases:
+            print('test: ', test_case)
             sum += 1
             file_path= f'{tests_path}/{class_name}/{test_case}'
             result = test(file_path)
