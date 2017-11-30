@@ -1,163 +1,88 @@
-# use natural language toolkit
-import nltk
-from nltk.stem.lancaster import LancasterStemmer
-import os
-import json
+import os, sys, json, time, datetime
 import numpy as np
-import time
-import datetime
-from preprocess import read_file
-from preprocess import write_file
-stemmer = LancasterStemmer()
+from utils import read_file, write_file, sigmoid, sigmoid_derivative
 
-classes = []
-training = []
-output = []
-words = []
+def train(X, y, alpha=1, epochs=10000, classes=[]):
 
-folders = os.listdir('resources/data/processed')
-classes = np.array(folders)
-dictionary = read_file('resources/dictionary').split(', ')
-words = np.array(dictionary)
-count = 0
-
-training = np.array([], 'float32')
-output = np.array([], 'float32')
-
-for folder_name in folders:
-    train_files = os.listdir(f'resources/data/processed/{folder_name}')
-
-    for file in train_files:
-        text = read_file(f'resources/data/processed/{folder_name}/{file}').split(', ')
-        if len(text)<= 0:
-            continue
-        line = np.zeros(len(dictionary))
-        for word in text:
-            count += 1
-            if word == '':
-                continue
-            try:
-                line[dictionary.index(word)] += 1
-                break;
-            except:
-                print('error: ', file)
-                print('word: ', word)
-##                print('index: ', dictionary.index(word))
-                print('len: ', len(text))
-                raise
-        training = np.append(training, line)
-        output_new = np.zeros(len(classes))
-        output_new[np.where(folders == folder_name)] = 1
-        output = np.append(output, output_new)
-    print('training: ', len(training))
-    print('line: ', len(line))
-    
-training = np.reshape(training, (count, len(dictionary)))
-print('count: ', count)
-print('line len: ', len(training[0]))
-print('line o len: ', len(output[0]))
-print('out o: ', output[1])
-
-# compute sigmoid nonlinearity
-def sigmoid(x):
-    output = 1/(1+np.exp(-x))
-    return output
-
-# convert output of sigmoid function to its derivative
-def sigmoid_output_to_derivative(output):
-    return output*(1-output)
-
-# ANN and Gradient Descent code from https://iamtrask.github.io//2015/07/27/python-network-part2/
-def train(X, y, hidden_neurons=10, alpha=1, epochs=50000, dropout=False, dropout_percent=0.5):
-
-    print ("Training with %s neurons, alpha:%s, dropout:%s %s" % (hidden_neurons, str(alpha), dropout, dropout_percent if dropout else '') )
-    print ("Input matrix: %sx%s    Output matrix: %sx%s" % (len(X),len(X[0]),1, len(classes)) )
+    print ("Training with alpha:%s" % (str(alpha)) )
+    print ("Input matrix: %sx%s    Output matrix: %sx%s" % (len(X),len(X[0]),len(X[0]), len(classes)) )
     np.random.seed(1)
 
     last_mean_error = 1
-    # randomly initialize our weights with mean 0
-    synapse_0 = 2*np.random.random((len(X[0]), hidden_neurons)) - 1
-    synapse_1 = 2*np.random.random((hidden_neurons, len(classes))) - 1
 
-    prev_synapse_0_weight_update = np.zeros_like(synapse_0)
-    prev_synapse_1_weight_update = np.zeros_like(synapse_1)
-
-    synapse_0_direction_count = np.zeros_like(synapse_0)
-    synapse_1_direction_count = np.zeros_like(synapse_1)
+    synapse_0 = 2 * np.random.random((len(X[0]), len(classes))) - 1
         
+    layer_0 = X
     for j in iter(range(epochs+1)):
 
-        # Feed forward through layers 0, 1, and 2
-        layer_0 = X
         layer_1 = sigmoid(np.dot(layer_0, synapse_0))
-                
-        if(dropout):
-            layer_1 *= np.random.binomial([np.ones((len(X),hidden_neurons))],1-dropout_percent)[0] * (1.0/(1-dropout_percent))
 
-        layer_2 = sigmoid(np.dot(layer_1, synapse_1))
-
-        # how much did we miss the target value?
-        layer_2_error = y - layer_2
-
-        if (j% 10000) == 0 and j > 5000:
-            # if this 10k iteration's error is greater than the last iteration, break out
-            if np.mean(np.abs(layer_2_error)) < last_mean_error:
-                print ("delta after "+str(j)+" iterations:" + str(np.mean(np.abs(layer_2_error))) )
-                last_mean_error = np.mean(np.abs(layer_2_error))
-            else:
-                print ("break:", np.mean(np.abs(layer_2_error)), ">", last_mean_error )
+        layer_1_error = y - layer_1
+        if (j% 1000) == 0:
+            error = np.mean(np.abs(layer_1_error))
+            if error >= last_mean_error or error < 1e-2:
+                print ('break:', error, ', ', last_mean_error )
                 break
-                
-        # in what direction is the target value?
-        # were we really sure? if so, don't change too much.
-        layer_2_delta = layer_2_error * sigmoid_output_to_derivative(layer_2)
+            print ('delta after ', j, ' iters:', error)
+            last_mean_error = error
 
-        # how much did each l1 value contribute to the l2 error (according to the weights)?
-        layer_1_error = layer_2_delta.dot(synapse_1.T)
-
-        # in what direction is the target l1?
-        # were we really sure? if so, don't change too much.
-        layer_1_delta = layer_1_error * sigmoid_output_to_derivative(layer_1)
+        layer_1_delta = layer_1_error * sigmoid_derivative(layer_1)
         
-        synapse_1_weight_update = (layer_1.T.dot(layer_2_delta))
-        synapse_0_weight_update = (layer_0.T.dot(layer_1_delta))
+        synapse_0_weight_update = layer_0.T.dot(layer_1_delta)
         
-        if(j > 0):
-            synapse_0_direction_count += np.abs(((synapse_0_weight_update > 0)+0) - ((prev_synapse_0_weight_update > 0) + 0))
-            synapse_1_direction_count += np.abs(((synapse_1_weight_update > 0)+0) - ((prev_synapse_1_weight_update > 0) + 0))        
-        
-        synapse_1 += alpha * synapse_1_weight_update
         synapse_0 += alpha * synapse_0_weight_update
-        
-        prev_synapse_0_weight_update = synapse_0_weight_update
-        prev_synapse_1_weight_update = synapse_1_weight_update
 
     now = datetime.datetime.now()
+    synapse = {'synapse0': synapse_0.tolist()}
+    with open('synapses.json', 'w') as outfile:
+        json.dump(synapse, outfile, indent=4)
+    print('Train done.')
 
-    # persist synapses
-    synapse = {'synapse0': synapse_0.tolist(), 'synapse1': synapse_1.tolist(),
-               'datetime': now.strftime("%Y-%m-%d %H:%M"),
-               'words': words,
-               'classes': classes
-              }
-    synapse_file = "synapses-ex.json"
+def main():
+    train_path = 'resources/data/train'
+    training = []
+    output = []
+    # load resources
+    classes = read_file('resources/classes').split(', ')
+    dictionary = read_file('resources/dictionary')[1:-1].replace("'", "").split(', ')
+    train_folders = os.listdir(train_path)
+    for folder in train_folders:
+        train_files = os.listdir(f'{train_path}/{folder}')
+        for file in train_files:
+            print("Processing...", file)
+            train_case = [0] * len(dictionary)
+            file_path = f'{train_path}/{folder}/{file}'
+            text = read_file(file_path)[1:-1].replace("'", "").split(', ')
+            for item in text:
+                if item == '':
+                    continue
+                try:
+                    (word, value) = item.split(': ')
+                    train_case[dictionary.index(word)] = int(value)
+                except:
+                    print("item: ", item)
+                    print("words: ", word)
+                    print("value: ", value)
+                    sys.exit(0)
+            training.append(train_case)
+            output_case = [0] * len(train_folders)
+            output_case[train_folders.index(folder)] = 1
+            output.append(output_case)
 
-    with open(synapse_file, 'w') as outfile:
-        json.dump(synapse, outfile, indent=4, sort_keys=True)
-    print ("saved synapses to:", synapse_file)
+    print("training: ", len(training), ' x ', len(training[0]))
+    print("ouput: ", len(output), ' x ', len(output[0]))
+    # write_file('resources/training', str(training))
+    # write_file('resources/output', str(output))
 
-print('training leng: ', len(training))
-print('ouput len: ', len(output))
-X = np.array(training)
-y = np.array(output)
+    X = np.array(training)
+    y = np.array(output)
 
-start_time = time.time()
+    start_time = time.time()
 
-print('INPUT: ', training)
-print('OUTPUT: ', output)
-##train(X, y, hidden_neurons=20, alpha=0.1, epochs=100000, dropout=False, dropout_percent=0.2)
+    train(X, y, alpha=0.1, epochs=10000, classes=classes)
 
-elapsed_time = time.time() - start_time
-print ("processing time:", elapsed_time, "seconds")
+    elapsed_time = time.time() - start_time
+    print ("processing time:", elapsed_time, "seconds")
 
-
+if __name__ == '__main__':
+    main()

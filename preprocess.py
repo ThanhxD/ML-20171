@@ -1,189 +1,86 @@
-import os
-import re
-import math
-import nltk
+import os, math, nltk, sys
+import numpy as np
+from utils import read_file, write_file, wordenize
 from nltk.stem.lancaster import LancasterStemmer
 from nltk.stem.wordnet import WordNetLemmatizer
 
-def normalize(file):
-    """
-    Normalize text: replace special paterns by word
-    file
-    """
-    text = file
-    match = {
-        ' currency ': '(\€|\¥|\£|\$)\d+([\.\,]\d+)*',
-        ' email ': '[^\r\n @]+@[^ ]+',
-        ' url ': '(((http|https):*\/\/[^\s]*)|((www)\.[^\s]*)|([^\s]*(\.com|\.co\.uk|\.net)[^\s]*))',
-        ' number ': '\d+[\.\,]*\d*',
-        '*': '(\'s|\'ll|n\'t|\'re|\'d|\'ve)',
-        ' ': '[^a-zA-Z]'
-    }
-    for key in match:
-        text = re.sub(match[key], key, text)
-    return text
+def process_file(text):
+    lemmatizer = WordNetLemmatizer()
+    stemmer = LancasterStemmer()
+    return_text = wordenize(lemmatizer, stemmer, text)
+    return return_text
 
-def ensure_path(path):
-    """
-    Ensure path exists for write file
-    path
-    """
-    subs = path.split('/')
-    full_fill = '.'
-    for name in subs[:-1]:
-        full_fill += f'/{name}'
-        if not os.path.exists(full_fill):
-            os.makedirs(full_fill)
-    full_fill += f'/{subs[-1]}'
-    return full_fill
-
-def load_stop_word(lemmatizer, stemmer):
-    """
-    Load stop words file and stem them
-    stemmer
-    """
-    text = read_file('resources/stopwords')
-    words = text.split(', ')
-    words = [stemmer.stem(lemmatizer.lemmatize(word.lower())) for word in words]
-    return words
-
-def read_file(file_path):
-    """
-    Read file from disk
-    file_path
-    """
-    file = open(file_path, 'r')
-    text = file.read()
-    file.close()
-    return text
-
-def write_file(file_path, data):
-    """
-    Write file to disk
-    file_path
-    data
-    """
-    file = open(ensure_path(file_path), 'w')
-    file.write(data)
-    file.close()
-
-def wordenize(lemmatizer, stemmer, text, stop_words):
-    """
-    Split text into words and stem them 
-    Notice: no filter stop-word here
-
-    stemmer -- stemmer object
-    text    -- text to wordenize
-    """
-    text = normalize(text)
-    words = nltk.word_tokenize(text)
-    words = [stemmer.stem(lemmatizer.lemmatize(word.lower())) for word in words if word not in stop_words]
-    return words
-
-def process_data(lemmatizer, stemmer, stop_words):    
-    # read train folder
-    train_folders = os.listdir('data-raw/train')
-    for folder_name in train_folders:
-        
-        # for each folder: list file
-        train_files = os.listdir(f'data-raw/train/{folder_name}')
-        print(f'Working: {folder_name}')
-
-        for file in train_files:
-            
-            # for each file: read file
-            text = read_file(f'data-raw/train/{folder_name}/{file}')
-
-            # then wordenize it to array of words
-            words = wordenize(lemmatizer, stemmer, text, stop_words)
-
-            # write out
-            write_file(f'resources/data/train/{folder_name}/{file}', ', '.join(words))
-
-def tf_idf(word, current_doc, documents):
-    current_count = 0
-    current_len = len(current_doc)
-    for w in current_doc:
-        if word == w:
-            current_count += 1
-    tf = current_count / current_len
-
-    all_count = 0
-    all_len = len(documents)
-    for d in documents:
-        if word in d:
-            all_count += 1
-    if all_count == 0:
-        all_count = 1
-    idf = math.log(all_len / all_count, 10)
-
-    return tf * idf
-
-def make_dictionary():
-    dictionary = []
-    # Read words from file
-    train_folders = os.listdir('resources/data/train')
-    words = []
-    for folder_name in train_folders:
-        # for each folder: list file
-        train_files = os.listdir(f'resources/data/train/{folder_name}')
-        print(f'Working: {folder_name}')
-        line = []
-
-        for file in train_files:
-            
-            # for each file: read file
-            text = read_file(f'resources/data/train/{folder_name}/{file}')
-
-            line += text.split(', ');
-        
-        words.append(line);
-
-    for i in range(len(words)):
-        line = list(set(words[i]))
-        freq = {}
-        for word in line:
-            freq[word] = 0
-        for j in range(len(words[i])):
-            freq[words[i][j]] += 1
-        line = [w for w in line if (freq[w] > 4 and freq[w] < 4000)]
-        print ('=====================> ', i, ' ============ ', len(line))
-        j = 0
-        new_line = []
-        for word in line:
-            # print (j, ' - ', word)
-            value = tf_idf(word, words[i], words)
-            if value >= 2e-05:
-                new_line.append(word)
-            j += 1
-        dictionary += new_line
-
-    # write out
-    write_file('resources/dictionary', ', '.join(dictionary))
-
-    print('dictionary: ', len(dictionary))
-    print('train_folder: ', len(train_folders))
-    for i in range(len(train_folders)):
-        print('i: ', i)
-        folder_name = train_folders[i]
-        train_files = os.listdir(f'resources/data/train/{folder_name}')
-        for file in train_files:
-            text = read_file(f'resources/data/train/{folder_name}/{file}')
-            arr_text = text.split(', ');
-            elements_in_both_lists = [w for w in arr_text if w in dictionary]
-            print(f'Write: {folder_name}/{file}')
-            write_file(f'resources/data/processed/{folder_name}/{file}', ', '.join(elements_in_both_lists))
+def counting(words):
+    freq = {}
+    for word in words:
+        if word in freq:
+            freq[word] += 1
+        else:
+            freq[word] = 1
+    return freq
 
 def main():
-    # """ MAIN FUNCTION """
+    """ MAIN """
+    train_path = 'data-raw/train'
+    processed_path = 'resources/data/train'
+    folders = os.listdir(train_path)
+    bag_of_words = []
     
-    stemmer = LancasterStemmer()
-    lemmatizer = WordNetLemmatizer()
-    stop_words = load_stop_word(lemmatizer, stemmer)
-    process_data(lemmatizer, stemmer, stop_words)
-    
-    # make_dictionary(stemmer)
-    make_dictionary()  
+    # preprocess file
+    for folder in folders:
+        files_path = f'{train_path}/{folder}'
+        files = os.listdir(files_path)
+        print('Processing...', folder)
+        for file in files:
+            file_path = f'{files_path}/{file}'
+            text = read_file(file_path)
+            words = process_file(text)
+            bag_of_words.append({'path': f'{folder}/{file}', 'words': words})
+
+    # for row in bag_of_words:
+    #     path = row['path']
+    #     write_file(f'resources/data/temp/{path}', str(row['words']))
+    # # make dictionary and filter file by this dict
+    # list_folders = os.listdir('resources/data/temp')
+    # for folder in list_folders:
+    #     list_files = os.listdir(f'resources/data/temp/{folder}')
+    #     for file in list_files:
+    #         text = read_file(f'resources/data/temp/{folder}/{file}').replace("'", "")
+    #         text = text[1:-1].split(', ')
+    #         bag_of_words.append({'path': f'{folder}/{file}', 'words': text})
+    freq_idf = {}
+    freq_tf = []
+    dictionary = []
+    sum_docs = len(bag_of_words)
+    for row in bag_of_words:
+        count = counting(row['words'])
+        freq_tf.append(count)
+        words = list(set(row['words']))
+        for word in words:
+            if word in freq_idf:
+                freq_idf[word] += 1
+            else:
+                freq_idf[word] = 1
+    for row in bag_of_words:
+        row_index = bag_of_words.index(row)
+        print("processing...", row_index)
+        words = list(set(row['words']))
+        current_freq_tf = freq_tf[row_index]
+        return_row = {}
+        for word in words:
+            count = current_freq_tf[word]
+            if count < 3 or count > 3000:
+                continue
+            tf_idf = (count/len(row['words'])) * math.log(sum_docs/freq_idf[word])
+            if tf_idf < 0.002:
+                continue
+            return_row[word] = count
+            dictionary.append(word)
+        file_path = row['path']
+        write_file(f'{processed_path}/{file_path}', str(return_row))
+    dictionary = list(set(dictionary))
+    write_file('resources/dictionary', str(dictionary))
+    print('Preprocess done.')
 
 if __name__ == '__main__':
     main()
