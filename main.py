@@ -8,7 +8,7 @@ def main():
     dictionary = read_file('resources/dictionary')[1:-1].replace("'", "").split(', ')
     classes = read_file('resources/classes').split(', ')
     with open('synapses.json') as json_data:
-        synapse0 = json.load(json_data.read())
+        synapse0 = json.load(json_data)['synapse0']
 
     file = read_file('input.txt')
     lemmatizer = WordNetLemmatizer()
